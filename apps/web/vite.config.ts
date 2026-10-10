@@ -22,7 +22,7 @@ const proxied = [
   "/hooks",
 ];
 
-export default defineConfig(({ command }) => ({
+export default defineConfig(({ command, mode }) => ({
   plugins: [react(), tailwindcss()],
   build: {
     outDir: "dist",
@@ -35,9 +35,9 @@ export default defineConfig(({ command }) => ({
     host: true,
     port: 443,
     strictPort: true,
-    // Only for the dev server: `vite build` (CI) has no certificate.
+    // Only for the dev server: `vite build` and Vitest (CI) have no certificate.
     https:
-      command === "serve"
+      command === "serve" && mode !== "test"
         ? {
             cert: readFileSync(new URL(`${HOST}.pem`, CERTS)),
             key: readFileSync(new URL(`${HOST}-key.pem`, CERTS)),
