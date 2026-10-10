@@ -1,0 +1,21 @@
+{
+  "name": "@template/auth",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@template/contracts": "workspace:*",
+    "@template/db": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^24",
+    "vitest": "4.1.11"
+  }
+}

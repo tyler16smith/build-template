@@ -1,0 +1,43 @@
+# Rolls production back to the previous Worker version (`pnpm rollback`, or this button).
+# Migrations aren't rolled back: they're expand-only, so the previous version works against the
+# current schema (SPEC.md, "Environments, deployment and CI").
+name: rollback
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Worker version id to roll back to (empty: the previous one)"
+        required: false
+        default: ""
+
+concurrency:
+  group: production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  rollback:
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: wrangler rollback
+        working-directory: apps/server
+        run: pnpm exec wrangler rollback ${{ inputs.version }} --env production --message "rollback by ${{ github.actor }}" --yes
+      - run: pnpm --filter @template/e2e exec playwright install --with-deps chromium
+      - name: Read-only smoke checks
+        run: pnpm smoke
+        env:
+          E2E_BASE_URL: ${{ vars.PRODUCTION_URL }}

@@ -1,0 +1,208 @@
+// One Worker: the SPA's static assets, /api, the OAuth endpoints, /mcp, the agents (/agents) and
+// the inbound hooks (/hooks), on one origin. The Assistant and the Automation Builder are Durable
+// Objects and the automation runtime is a Workflow: classes exported from src/index.ts.
+// The top level is local development (`pnpm dev`): Postgres in Docker, mail captured at /dev/mail.
+// `env.staging` and `env.production` are the deployed Workers, each in its own Cloudflare account
+// and served on workers.dev until there's a domain. `pnpm rename` fills in names and domains; the
+// README's setup section says where each id comes from.
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "build-template-local",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-20",
+  "minify": true,
+  // global_fetch_strictly_public: the OAuth server fetches client ID metadata documents (Claude,
+  // ChatGPT) from URLs clients choose, so those fetches must never reach private addresses.
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": {
+    "directory": "../web/dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    // Everything else is the SPA, served without running the Worker.
+    "run_worker_first": [
+      "/api/*",
+      "/auth/*",
+      "/mcp",
+      "/authorize",
+      "/token",
+      "/register",
+      "/.well-known/*",
+      "/agents/*",
+      "/hooks/*",
+    ],
+  },
+  // Workers Logs, structured JSON from ctx.log. Invocation logs stay OFF: they record request
+  // metadata, and this Worker receives session cookies, bearer tokens and OAuth codes.
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1,
+    "logs": { "enabled": true, "invocation_logs": false },
+  },
+  "upload_source_maps": true,
+  // CI deploys with `--tag <commit sha>`; every log line and metric carries it.
+  "version_metadata": { "binding": "CF_VERSION" },
+  "vars": {
+    "ENVIRONMENT": "local",
+    "APP_NAME": "Build Template",
+    "APP_ORIGIN": "https://app.local.private",
+    "MCP_REQUIRE_VERIFIED_EMAIL": "true",
+  },
+  // Locally, interactive transactions and batches both go straight to Docker Postgres
+  // (`pnpm db:local`) as app_runtime.
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "local",
+      "localConnectionString": "postgres://app_runtime:template-local@127.0.0.1:5434/app",
+    },
+  ],
+  // The Assistant and the Automation Builder (specs/ai.md): a Durable Object per conversation.
+  "durable_objects": {
+    "bindings": [
+      { "name": "AssistantAgent", "class_name": "AssistantAgent" },
+      { "name": "AutomationAgent", "class_name": "AutomationAgent" },
+    ],
+  },
+  // Automation runs: one Workflow instance per run.
+  "workflows": [
+    {
+      "name": "build-template-automation-runs-local",
+      "binding": "AUTOMATION_WORKFLOW",
+      "class_name": "AutomationRunWorkflow",
+    },
+  ],
+  // Workers AI isn't bound locally (it only runs remotely): set ANTHROPIC_API_KEY in .dev.vars
+  // for the Assistant.
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["AssistantAgent", "AutomationAgent"] }],
+  "kv_namespaces": [{ "binding": "OAUTH_KV", "id": "local-oauth-kv" }],
+  "ratelimits": [
+    { "name": "AUTH_LIMIT", "namespace_id": "1001", "simple": { "limit": 20, "period": 60 } },
+    { "name": "REGISTER_LIMIT", "namespace_id": "1002", "simple": { "limit": 10, "period": 60 } },
+    {
+      "name": "CLIENT_ERROR_LIMIT",
+      "namespace_id": "1003",
+      "simple": { "limit": 30, "period": 60 },
+    },
+    { "name": "ZAPIER_LIMIT", "namespace_id": "1004", "simple": { "limit": 120, "period": 60 } },
+  ],
+  // Daily: account cleanup (deleted 30+ days ago) and expired OAuth records. Every five minutes:
+  // due automation schedules and Zapier events to retry (`AUTOMATIONS_CRON` in src/index.ts).
+  "triggers": { "crons": ["17 9 * * *", "*/5 * * * *"] },
+  "env": {
+    "staging": {
+      "name": "build-template-staging",
+      // The Cloudflare account comes from CLOUDFLARE_ACCOUNT_ID (README, "Cloudflare").
+      // No domain yet. With one: "workers_dev": false and
+      // "routes": [{ "pattern": "staging.<domain>", "custom_domain": true }].
+      "workers_dev": true,
+      "preview_urls": false,
+      // Next to the database (Neon, AWS us-west-2).
+      "placement": { "mode": "targeted", "region": "aws:us-west-2" },
+      "vars": {
+        "ENVIRONMENT": "staging",
+        "APP_NAME": "Build Template (staging)",
+        "APP_ORIGIN": "https://build-template-staging.your-subdomain.workers.dev",
+        "MCP_REQUIRE_VERIFIED_EMAIL": "true",
+        // Every model call goes through this AI Gateway (README, "AI").
+        "AI_GATEWAY_ID": "build-template-staging",
+      },
+      "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "<staging-hyperdrive-id>" }],
+      // The Assistant and the Automation Builder (specs/ai.md): a Durable Object per conversation.
+      "durable_objects": {
+        "bindings": [
+          { "name": "AssistantAgent", "class_name": "AssistantAgent" },
+          { "name": "AutomationAgent", "class_name": "AutomationAgent" },
+        ],
+      },
+      // Automation runs: one Workflow instance per run.
+      "workflows": [
+        {
+          "name": "build-template-automation-runs-staging",
+          "binding": "AUTOMATION_WORKFLOW",
+          "class_name": "AutomationRunWorkflow",
+        },
+      ],
+      // Workers AI: the model when there's no ANTHROPIC_API_KEY, and the AI Gateway binding.
+      "ai": { "binding": "AI" },
+      "kv_namespaces": [{ "binding": "OAUTH_KV", "id": "<staging-kv-id>" }],
+      "ratelimits": [
+        { "name": "AUTH_LIMIT", "namespace_id": "2001", "simple": { "limit": 20, "period": 60 } },
+        {
+          "name": "REGISTER_LIMIT",
+          "namespace_id": "2002",
+          "simple": { "limit": 10, "period": 60 },
+        },
+        {
+          "name": "CLIENT_ERROR_LIMIT",
+          "namespace_id": "2003",
+          "simple": { "limit": 30, "period": 60 },
+        },
+        {
+          "name": "ZAPIER_LIMIT",
+          "namespace_id": "2004",
+          "simple": { "limit": 120, "period": 60 },
+        },
+      ],
+      "analytics_engine_datasets": [{ "binding": "METRICS", "dataset": "build_template_staging" }],
+      "version_metadata": { "binding": "CF_VERSION" },
+      "triggers": { "crons": ["17 9 * * *", "*/5 * * * *"] },
+    },
+    "production": {
+      "name": "build-template",
+      // No domain yet. With one: "workers_dev": false and
+      // "routes": [{ "pattern": "app.<domain>", "custom_domain": true }].
+      "workers_dev": true,
+      "preview_urls": false,
+      "placement": { "mode": "targeted", "region": "aws:us-west-2" },
+      "vars": {
+        "ENVIRONMENT": "production",
+        "APP_NAME": "Build Template",
+        "APP_ORIGIN": "https://build-template.your-subdomain.workers.dev",
+        "MCP_REQUIRE_VERIFIED_EMAIL": "true",
+        "AI_GATEWAY_ID": "build-template",
+      },
+      "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "<production-hyperdrive-id>" }],
+      // The Assistant and the Automation Builder (specs/ai.md): a Durable Object per conversation.
+      "durable_objects": {
+        "bindings": [
+          { "name": "AssistantAgent", "class_name": "AssistantAgent" },
+          { "name": "AutomationAgent", "class_name": "AutomationAgent" },
+        ],
+      },
+      // Automation runs: one Workflow instance per run.
+      "workflows": [
+        {
+          "name": "build-template-automation-runs",
+          "binding": "AUTOMATION_WORKFLOW",
+          "class_name": "AutomationRunWorkflow",
+        },
+      ],
+      // Workers AI: the model when there's no ANTHROPIC_API_KEY, and the AI Gateway binding.
+      "ai": { "binding": "AI" },
+      "kv_namespaces": [{ "binding": "OAUTH_KV", "id": "<production-kv-id>" }],
+      "ratelimits": [
+        { "name": "AUTH_LIMIT", "namespace_id": "3001", "simple": { "limit": 20, "period": 60 } },
+        {
+          "name": "REGISTER_LIMIT",
+          "namespace_id": "3002",
+          "simple": { "limit": 10, "period": 60 },
+        },
+        {
+          "name": "CLIENT_ERROR_LIMIT",
+          "namespace_id": "3003",
+          "simple": { "limit": 30, "period": 60 },
+        },
+        {
+          "name": "ZAPIER_LIMIT",
+          "namespace_id": "3004",
+          "simple": { "limit": 120, "period": 60 },
+        },
+      ],
+      "analytics_engine_datasets": [
+        { "binding": "METRICS", "dataset": "build_template_production" },
+      ],
+      "version_metadata": { "binding": "CF_VERSION" },
+      "triggers": { "crons": ["17 9 * * *", "*/5 * * * *"] },
+    },
+  },
+}

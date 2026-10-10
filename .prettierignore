@@ -1,0 +1,9 @@
+pnpm-lock.yaml
+dist
+build
+.wrangler
+node_modules
+worker-configuration.d.ts
+packages/db/drizzle
+packages/contracts/actions.schema.json
+apps/web/src/routeTree.gen.ts

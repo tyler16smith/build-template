@@ -1,0 +1,6 @@
+# apps/desktop, apps/ios and apps/android hold only an AGENTS.md and aren't workspace members.
+packages:
+  - apps/server
+  - apps/web
+  - packages/*
+  - e2e

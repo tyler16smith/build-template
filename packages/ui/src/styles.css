@@ -1,0 +1,313 @@
+/*
+ * Design tokens (v1.0.0), ported from Custombase's `@custombase/ui`.
+ * Consumers: `@import "tailwindcss"; @import "<path>/ui/src/styles.css";` and add an `@source`
+ * pointing at the ui sources so Tailwind sees the component class names.
+ *
+ * Every color is a semantic token. Components never use raw palette colors, so light/dark mode
+ * and the brand accent work everywhere. Text/background pairs are chosen to meet
+ * WCAG 2.2 AA (4.5:1 for body text, 3:1 for large text and UI boundaries).
+ */
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --ui-accent: #4f46e5;
+  --ui-accent-foreground: #ffffff;
+
+  --ui-background: #f7f7f8;
+  --ui-foreground: #18181b;
+  --ui-surface: #ffffff;
+  --ui-surface-raised: #ffffff;
+  --ui-surface-sunken: #efeff1;
+  --ui-muted: #f1f1f3;
+  --ui-muted-foreground: #52525b;
+  --ui-border: #dcdce0;
+  --ui-border-strong: #a1a1aa;
+  --ui-input: #c4c4cc;
+  --ui-ring: var(--ui-accent);
+  /* Translucent focus for rounded fields. Follows `--ui-ring`, including a form theme's accent. */
+  --ui-ring-soft: color-mix(in oklab, var(--ui-ring) 40%, transparent);
+
+  --ui-primary: var(--ui-accent);
+  --ui-primary-foreground: var(--ui-accent-foreground);
+  --ui-secondary: #ececef;
+  --ui-secondary-foreground: #18181b;
+
+  --ui-success: #15803d;
+  --ui-success-soft: #dcfce7;
+  --ui-warning: #a16207;
+  --ui-warning-soft: #fef3c7;
+  --ui-danger: #b91c1c;
+  --ui-danger-soft: #fee2e2;
+  --ui-info: #1d4ed8;
+  --ui-info-soft: #dbeafe;
+
+  --ui-overlay: rgb(9 9 11 / 0.5);
+  --ui-shadow: 0 1px 2px rgb(9 9 11 / 0.06), 0 1px 3px rgb(9 9 11 / 0.08);
+  --ui-shadow-lg: 0 10px 30px -10px rgb(9 9 11 / 0.25), 0 4px 10px -4px rgb(9 9 11 / 0.1);
+  /* The lighter band that sweeps across loading text (`ShimmerText`). */
+  --ui-shimmer: color-mix(in oklab, var(--ui-muted-foreground) 28%, var(--ui-surface));
+
+  --ui-radius: 0.625rem;
+  --ui-font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --ui-font-mono: ui-monospace, "SFMono-Regular", Menlo, monospace;
+  /* Brand voice, for the wordmark and marketing headlines. Consumers load the face. */
+  --ui-font-serif: "Libre Baskerville", ui-serif, Georgia, "Times New Roman", serif;
+
+  color-scheme: light;
+}
+
+.dark {
+  --ui-background: #0c0c0f;
+  --ui-foreground: #f4f4f5;
+  --ui-surface: #151519;
+  --ui-surface-raised: #1c1c21;
+  --ui-surface-sunken: #0f0f12;
+  --ui-muted: #1f1f25;
+  --ui-muted-foreground: #a1a1aa;
+  --ui-border: #2e2e36;
+  --ui-border-strong: #52525b;
+  --ui-input: #3f3f46;
+  --ui-secondary: #26262d;
+  --ui-secondary-foreground: #f4f4f5;
+
+  --ui-success: #4ade80;
+  --ui-success-soft: #14532d;
+  --ui-warning: #facc15;
+  --ui-warning-soft: #422006;
+  --ui-danger: #f87171;
+  --ui-danger-soft: #450a0a;
+  --ui-info: #93c5fd;
+  --ui-info-soft: #172554;
+
+  --ui-overlay: rgb(0 0 0 / 0.65);
+  --ui-shadow: 0 1px 2px rgb(0 0 0 / 0.4);
+  --ui-shadow-lg: 0 12px 32px -8px rgb(0 0 0 / 0.6);
+  --ui-shimmer: color-mix(in oklab, var(--ui-foreground) 92%, var(--ui-muted-foreground));
+
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-background: var(--ui-background);
+  --color-foreground: var(--ui-foreground);
+  --color-surface: var(--ui-surface);
+  --color-surface-raised: var(--ui-surface-raised);
+  --color-surface-sunken: var(--ui-surface-sunken);
+  --color-muted: var(--ui-muted);
+  --color-muted-foreground: var(--ui-muted-foreground);
+  --color-border: var(--ui-border);
+  --color-border-strong: var(--ui-border-strong);
+  --color-input: var(--ui-input);
+  --color-ring: var(--ui-ring);
+  --color-ring-soft: var(--ui-ring-soft);
+  --color-primary: var(--ui-primary);
+  --color-primary-foreground: var(--ui-primary-foreground);
+  --color-secondary: var(--ui-secondary);
+  --color-secondary-foreground: var(--ui-secondary-foreground);
+  --color-accent: var(--ui-accent);
+  --color-accent-foreground: var(--ui-accent-foreground);
+  --color-success: var(--ui-success);
+  --color-success-soft: var(--ui-success-soft);
+  --color-warning: var(--ui-warning);
+  --color-warning-soft: var(--ui-warning-soft);
+  --color-danger: var(--ui-danger);
+  --color-danger-soft: var(--ui-danger-soft);
+  --color-info: var(--ui-info);
+  --color-info-soft: var(--ui-info-soft);
+  --color-overlay: var(--ui-overlay);
+
+  --radius-sm: calc(var(--ui-radius) - 4px);
+  --radius-md: calc(var(--ui-radius) - 2px);
+  --radius-lg: var(--ui-radius);
+  --radius-xl: calc(var(--ui-radius) + 4px);
+
+  --shadow-sm: var(--ui-shadow);
+  --shadow-lg: var(--ui-shadow-lg);
+
+  --font-sans: var(--ui-font-sans);
+  --font-mono: var(--ui-font-mono);
+  --font-serif: var(--ui-font-serif);
+
+  --animate-ui-fade-in: ui-fade-in 150ms ease-out;
+  --animate-ui-fade-out: ui-fade-out 150ms ease-out forwards;
+  --animate-ui-slide-up: ui-slide-up 180ms cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-ui-slide-in-right: ui-slide-in-right 220ms cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-ui-slide-out-right: ui-slide-out-right 220ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  --animate-ui-slide-in-left: ui-slide-in-left 220ms cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-ui-slide-out-left: ui-slide-out-left 220ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  /* Chat: a new message, a new screen, a rising suggestion, and a step cover changing. */
+  --animate-ui-message-in: ui-message-in 240ms cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-ui-screen-in: ui-screen-in 320ms cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-ui-rise: ui-rise 380ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-ui-cover-in: ui-cover-in 260ms cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-ui-dot-pulse: ui-dot-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes ui-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes ui-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes ui-slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+}
+/* 5px matches the side-panel inset, so the panel clears the screen instead of leaving a sliver. */
+@keyframes ui-slide-in-right {
+  from {
+    transform: translateX(calc(100% + 5px));
+  }
+}
+@keyframes ui-slide-out-right {
+  to {
+    transform: translateX(calc(100% + 5px));
+  }
+}
+@keyframes ui-slide-in-left {
+  from {
+    transform: translateX(calc(-100% - 5px));
+  }
+}
+@keyframes ui-slide-out-left {
+  to {
+    transform: translateX(calc(-100% - 5px));
+  }
+}
+
+@keyframes ui-message-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+@keyframes ui-screen-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+@keyframes ui-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+@keyframes ui-cover-in {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+}
+@keyframes ui-dot-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.45;
+    transform: scale(0.8);
+  }
+}
+
+/*
+ * Loading text: muted text with a lighter band sweeping left to right, the way Notion and Cursor
+ * show work in progress. Under reduced motion it is plain muted text.
+ */
+.ui-shimmer {
+  color: var(--ui-muted-foreground);
+  background-image: linear-gradient(
+    90deg,
+    var(--ui-muted-foreground) 0%,
+    var(--ui-muted-foreground) 38%,
+    var(--ui-shimmer) 50%,
+    var(--ui-muted-foreground) 62%,
+    var(--ui-muted-foreground) 100%
+  );
+  background-size: 250% 100%;
+  background-position: 100% 0;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: ui-shimmer 1.9s linear infinite;
+}
+@keyframes ui-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: 0% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ui-shimmer {
+    animation: none;
+    background-image: none;
+    -webkit-text-fill-color: currentColor;
+  }
+}
+
+/* Width ease for a push side panel. Reduced motion already collapses transition duration. */
+.ui-side-panel-width {
+  transition-property: width;
+  transition-duration: 220ms;
+  transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/*
+ * The viewport below `AppShell`'s banner. `AppShell` sets `--ui-banner-h` to the banner's
+ * height, so full-height panes stay inside the screen instead of being pushed below it.
+ */
+@utility h-shell {
+  height: calc(100dvh - var(--ui-banner-h, 0px));
+}
+
+@utility min-h-shell {
+  min-height: calc(100dvh - var(--ui-banner-h, 0px));
+}
+
+@utility top-shell {
+  top: var(--ui-banner-h, 0px);
+}
+
+@layer base {
+  * {
+    border-color: var(--ui-border);
+  }
+  html {
+    font-family: var(--ui-font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+  body {
+    background: var(--ui-background);
+    color: var(--ui-foreground);
+    font-size: 0.9375rem;
+    line-height: 1.5;
+  }
+  :focus-visible {
+    outline: 2px solid var(--ui-ring);
+    outline-offset: 2px;
+  }
+  ::selection {
+    background: color-mix(in oklab, var(--ui-accent) 30%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

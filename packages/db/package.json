@@ -1,0 +1,30 @@
+{
+  "name": "@template/db",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./schema": "./src/schema.ts",
+    "./node": "./src/node/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "test:db": "vitest run --config vitest.db.config.ts",
+    "generate": "drizzle-kit generate"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "1.2.0",
+    "@template/contracts": "workspace:*",
+    "drizzle-orm": "0.45.3",
+    "pg": "8.23.1"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.8",
+    "@types/node": "^24",
+    "@types/pg": "^8.23.1",
+    "drizzle-kit": "0.31.11",
+    "vitest": "4.1.11"
+  }
+}

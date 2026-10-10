@@ -1,0 +1,163 @@
+# Push to main → check, build once, migrate and seed staging, deploy that build, then smoke, e2e
+# and the speed budgets against it. Only a run where every step passed is "successful", and only
+# a successful run can be promoted (promote.yml deploys its artifact, never a rebuild).
+# Pull requests run the checks only. The deploy jobs run only when the repository variable
+# DEPLOY_ENABLED is "true" (README, "GitHub"), so a fork or a fresh copy gets green checks
+# before it has any Cloudflare or Neon setup.
+name: staging
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# Pushes queue rather than cancel each other: every push reaches staging in order, or fails
+# visibly. A pull request's newer push cancels its older run.
+concurrency:
+  group: ${{ github.event_name == 'pull_request' && format('pr-{0}', github.ref) || 'staging' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm format:check
+      - run: pnpm typecheck
+      - run: pnpm test
+      - name: check:migrations
+        # Migrations added since the last push (or the pull request's base); on a branch's first
+        # push, every migration.
+        run: |
+          BASE="${{ github.event.pull_request.base.sha || github.event.before }}"
+          if [ -z "$BASE" ] || [ "$BASE" = "0000000000000000000000000000000000000000" ]; then BASE=none; fi
+          pnpm check:migrations --base "$BASE"
+      - run: pnpm check:boundaries
+      - run: pnpm check:permissions
+
+  # Isolation and role tests with real logins: app_runtime can't SET ROLE, owns nothing, and RLS
+  # alone keeps organizations apart (PGlite can't prove the login part).
+  database:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 2s --health-timeout 5s --health-retries 20
+    env:
+      PGPASSWORD: postgres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Roles and database, as on Neon
+        run: |
+          psql -h localhost -U postgres -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE ROLE app_migrator LOGIN PASSWORD 'ci';
+          CREATE ROLE app_runtime LOGIN PASSWORD 'ci' NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS;
+          CREATE DATABASE app_test OWNER app_migrator;
+          GRANT CONNECT ON DATABASE app_test TO app_runtime;
+          SQL
+          psql -h localhost -U postgres -d app_test -v ON_ERROR_STOP=1 \
+            -c "REVOKE CREATE ON SCHEMA public FROM PUBLIC" \
+            -c "ALTER SCHEMA public OWNER TO app_migrator" \
+            -c "CREATE EXTENSION IF NOT EXISTS citext"
+      - run: pnpm test:db
+        env:
+          TEST_DATABASE_URL: postgres://app_migrator:ci@localhost:5432/app_test
+          TEST_RUNTIME_URL: postgres://app_runtime:ci@localhost:5432/app_test
+
+  build:
+    needs: [check, database]
+    if: github.event_name != 'pull_request' && vars.DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # The web app, the Worker bundle, the migrations and the commit, once, as build/.
+      - run: pnpm build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bundle
+          path: build/
+          if-no-files-found: error
+          retention-days: 90
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: staging
+    env:
+      DATABASE_MIGRATOR_URL: ${{ secrets.DATABASE_MIGRATOR_URL }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@v4
+        with:
+          name: bundle
+          path: build
+      - name: Migrate staging (app_migrator)
+        run: pnpm db:migrate --env staging --migrations build/migrations
+      - name: Demo data
+        run: pnpm db:seed --env staging
+        env:
+          STAGING_DEMO_PASSWORD: ${{ secrets.STAGING_DEMO_PASSWORD }}
+      - name: Deploy the bundle, tagged with the commit
+        run: pnpm exec wrangler deploy --config build/wrangler.jsonc --env staging --tag "${{ github.sha }}" --message "staging ${{ github.sha }}"
+
+  verify:
+    needs: deploy
+    runs-on: ubuntu-latest
+    environment: staging
+    env:
+      E2E_BASE_URL: ${{ vars.STAGING_URL }}
+      E2E_TEST_MAIL_SECRET: ${{ secrets.TEST_MAIL_SECRET }}
+      E2E_BUDGETS: "1"
+      EXPECTED_COMMIT: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @template/e2e exec playwright install --with-deps chromium
+      # Smoke (health reports this commit), the account and OAuth + MCP flows, and the budgets.
+      - run: pnpm e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: e2e/test-results/

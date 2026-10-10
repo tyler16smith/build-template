@@ -1,0 +1,50 @@
+{
+  "name": "build-template",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "packageManager": "pnpm@10.4.1",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "pnpm cli dev",
+    "build": "pnpm --filter @template/contracts run build && pnpm --filter @template/web run build && pnpm --filter @template/server run build",
+    "typecheck": "pnpm -r --parallel run typecheck",
+    "test": "pnpm -r run test",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "cli": "pnpm --silent --filter @template/tooling exec tsx src/cli.ts",
+    "db:local": "pnpm cli db:local",
+    "db:migrate": "pnpm cli db:migrate",
+    "db:new": "pnpm cli db:new",
+    "db:seed": "pnpm cli db:seed",
+    "db:allow-demo": "pnpm cli db:allow-demo",
+    "check:migrations": "pnpm cli check:migrations",
+    "check:boundaries": "pnpm cli check:boundaries",
+    "check:permissions": "pnpm cli check:permissions",
+    "org:restore": "pnpm cli org:restore",
+    "test:db": "pnpm --filter @template/db run test:db",
+    "e2e": "pnpm --filter @template/e2e run e2e",
+    "smoke": "pnpm --filter @template/e2e run smoke",
+    "logs": "pnpm cli logs",
+    "promote": "pnpm cli promote",
+    "rollback": "pnpm cli rollback",
+    "rename": "pnpm cli rename"
+  },
+  "devDependencies": {
+    "prettier": "^3.6.2",
+    "typescript": "^7.0.2",
+    "wrangler": "^4.141.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "workerd",
+      "sharp"
+    ],
+    "overrides": {
+      "@modelcontextprotocol/sdk": "1.30.0"
+    }
+  }
+}

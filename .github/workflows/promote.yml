@@ -1,0 +1,55 @@
+# Production gets exactly what staging tested: the artifact of the latest successful staging run
+# on main, never a rebuild. Start it with the "Run workflow" button, or `pnpm promote`.
+name: promote
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    # Holds the production secrets; add a required reviewer there when more people join.
+    environment: production
+    env:
+      GH_TOKEN: ${{ github.token }}
+      DATABASE_MIGRATOR_URL: ${{ secrets.DATABASE_MIGRATOR_URL }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - name: Find the latest successful staging run
+        id: staging
+        run: |
+          RUN=$(gh run list --repo "${{ github.repository }}" --workflow staging.yml --branch main --status success --limit 1 --json databaseId,headSha --jq '.[0]')
+          if [ -z "$RUN" ] || [ "$RUN" = "null" ]; then echo "No successful staging run to promote." >&2; exit 1; fi
+          echo "run=$(echo "$RUN" | jq -r .databaseId)" >> "$GITHUB_OUTPUT"
+          echo "sha=$(echo "$RUN" | jq -r .headSha)" >> "$GITHUB_OUTPUT"
+      # The tooling at the same commit as the bundle, so the migration runner matches its files.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.staging.outputs.sha }}
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Download that run's bundle
+        run: gh run download "${{ steps.staging.outputs.run }}" --repo "${{ github.repository }}" --name bundle --dir build
+      - name: Migrate production with that run's migrations
+        run: pnpm db:migrate --env production --migrations build/migrations
+      - name: Deploy the bundle, keeping the commit as its tag
+        run: pnpm exec wrangler deploy --config build/wrangler.jsonc --env production --tag "${{ steps.staging.outputs.sha }}" --message "promote staging run ${{ steps.staging.outputs.run }}"
+      - run: pnpm --filter @template/e2e exec playwright install --with-deps chromium
+      - name: Read-only smoke checks (no sign-ups in production)
+        run: pnpm smoke
+        env:
+          E2E_BASE_URL: ${{ vars.PRODUCTION_URL }}
+          EXPECTED_COMMIT: ${{ steps.staging.outputs.sha }}

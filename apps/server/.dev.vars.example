@@ -1,0 +1,39 @@
+# Local secrets for `wrangler dev`. `pnpm dev` copies this to .dev.vars (git-ignored) on first run.
+# Deployed environments set the same names with `wrangler secret put <NAME> --env staging|production`
+# (Worker) and as GitHub environment secrets (CI). README, "Secrets", says which goes where.
+
+# Hashes session cookies and email tokens before they're stored. Any long random string locally;
+# a different one per deployed environment (openssl rand -base64 32).
+SESSION_PEPPER=local-pepper-change-me-0123456789abcdef
+
+# The Neon runtime URL (app_runtime, pooled) for one-request batches over HTTP. Unset locally:
+# the Worker talks to Docker Postgres through Hyperdrive's localConnectionString instead.
+# DATABASE_URL=
+
+# Email. Locally every message is captured and shown at /dev/mail, so these can stay empty.
+RESEND_API_KEY=
+MAIL_FROM=
+
+# Continue with Google: off until both are set. Locally it needs a redirect URI on a public domain
+# (Google refuses app.local.private), so it's usually tested on staging.
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+
+# Ask AI and the Automation Builder (README, "AI"). Without a key they say AI isn't set up
+# locally (Workers AI isn't bound in local development).
+ANTHROPIC_API_KEY=
+# AI_MODELS=claude-sonnet-5-5,claude-opus-5-5,claude-haiku-4-5-20251001
+
+# Seals Zapier hook URLs and webhook signing secrets: 32 random bytes, base64
+# (openssl rand -base64 32). Any value works locally.
+CONNECTION_ENCRYPTION_KEY=bG9jYWwtY29ubmVjdGlvbi1rZXktMzItYnl0ZXMhISE=
+
+# The demo accounts' password for `pnpm db:seed --env local` (staging uses the
+# STAGING_DEMO_PASSWORD GitHub secret; it's never committed).
+DEMO_PASSWORD=huff-and-puff-demo-2026
+
+# Staging only: lets the e2e suite read mail sent to .example addresses.
+# TEST_MAIL_SECRET=
+
+# Not Worker secrets (tooling, CI): DATABASE_MIGRATOR_URL (Neon app_migrator, direct URL),
+# CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID (deploys and `pnpm logs`).

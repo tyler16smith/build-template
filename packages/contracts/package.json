@@ -1,0 +1,24 @@
+{
+  "name": "@template/contracts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts",
+    "./actions.schema.json": "./actions.schema.json"
+  },
+  "scripts": {
+    "build": "tsx scripts/write-schema.ts",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@types/node": "^24",
+    "tsx": "^4.23.15",
+    "vitest": "4.1.11"
+  }
+}
