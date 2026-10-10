@@ -26,6 +26,10 @@ is named `build-template` and the packages are `@template/*`. If so and the requ
 product feature, say so and ask before writing code. Once renamed, it's an app: build freely, and
 don't send product code back to the template.
 
+**A deployment of the template** (a `DEPLOY.md` at the root) is a copy that only adds its own
+deploy settings. Don't change template code there: make the change in the template repository
+(its `upstream` remote) and merge it in, as `DEPLOY.md` describes.
+
 This file holds the rules that apply everywhere. Before working in one of these folders, read its
 own guide too:
 
