@@ -219,6 +219,7 @@ describe("pnpm rename", () => {
 });
 
 describe("pnpm db:seed", () => {
+  // A fresh PGlite with every migration, then the seed twice: slow on CI runners.
   it("refuses production and unmarked databases, and is idempotent", async () => {
     const test = await createTestPostgres();
     try {
@@ -278,5 +279,5 @@ describe("pnpm db:seed", () => {
     } finally {
       await test.close();
     }
-  });
+  }, 30_000);
 });
